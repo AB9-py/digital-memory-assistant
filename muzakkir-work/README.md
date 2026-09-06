@@ -24,14 +24,6 @@ This folder contains Syed Muzakkir's allotted deliverables for the **Digital Mem
 
 ---
 
-## Directory Structure
-
-The Flutter application is available in both locations for evaluator convenience:
-- `muzakkir-work/mobile/` (Muzakkir's individual review folder)
-- `mobile/` (Project root client folder)
-
----
-
 ## How to Run
 
 ```bash
