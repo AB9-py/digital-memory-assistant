@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from backend.schemas.chunk import ChunkBase
+
 
 class MemoryStatus(str, Enum):
     UPLOADED = "uploaded"
@@ -28,6 +30,14 @@ class MemoryCreate(MemoryBase):
     status: MemoryStatus = MemoryStatus.UPLOADED
 
 
+class MemoryIngestRequest(MemoryBase):
+    """Payload sent by the ingestion worker containing document metadata and extracted text chunks."""
+
+    user_id: uuid.UUID
+    file_path: str
+    chunks: list[ChunkBase] = Field(default_factory=list)
+
+
 class MemoryUpdateStatus(BaseModel):
     status: MemoryStatus
     meta_info: dict[str, Any] | None = None
@@ -42,3 +52,8 @@ class MemoryRead(MemoryBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemoryListResponse(BaseModel):
+    total: int
+    items: list[MemoryRead]
