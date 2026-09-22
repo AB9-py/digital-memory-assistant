@@ -110,6 +110,29 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         return await self._call_api(texts)
 
 
+class LocalEmbeddingProvider(BaseEmbeddingProvider):
+    """
+    Free, local semantic embeddings via sentence-transformers.
+    No API key required. Model downloads once (~130 MB for bge-small).
+    Default: BAAI/bge-small-en-v1.5 → 384-dim vectors.
+    Set EMBEDDING_DIM=384 in .env when using this provider.
+    """
+
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
+        from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
+
+        self.model = SentenceTransformer(model_name)
+        self.dimension: int = self.model.get_sentence_embedding_dimension() or 384
+
+    async def embed_text(self, text: str) -> list[float]:
+        return self.model.encode(text, normalize_embeddings=True).tolist()
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return self.model.encode(texts, normalize_embeddings=True).tolist()
+
+
 _provider_instance: BaseEmbeddingProvider | None = None
 
 
@@ -117,7 +140,8 @@ def get_embedding_provider() -> BaseEmbeddingProvider:
     """Dependency / factory returning the configured embedding provider."""
     global _provider_instance
     if _provider_instance is None:
-        if settings.EMBEDDING_PROVIDER.lower() == "openai" and settings.OPENAI_API_KEY:
+        provider = settings.EMBEDDING_PROVIDER.lower()
+        if provider == "openai" and settings.OPENAI_API_KEY:
             _provider_instance = OpenAIEmbeddingProvider(
                 api_key=settings.OPENAI_API_KEY,
                 model=settings.EMBEDDING_MODEL,
@@ -125,6 +149,12 @@ def get_embedding_provider() -> BaseEmbeddingProvider:
             )
             logger.info(
                 "Initialized OpenAIEmbeddingProvider (%s)", settings.EMBEDDING_MODEL
+            )
+        elif provider == "local":
+            _provider_instance = LocalEmbeddingProvider()
+            logger.info(
+                "Initialized LocalEmbeddingProvider (BAAI/bge-small-en-v1.5, dim=%s)",
+                _provider_instance.dimension,
             )
         else:
             _provider_instance = DeterministicEmbeddingProvider(
