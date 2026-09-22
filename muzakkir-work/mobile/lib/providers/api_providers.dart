@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
@@ -53,6 +54,69 @@ class SearchController extends AsyncNotifier<SearchResponse?> {
         data: payload.toJson(),
       );
       return SearchResponse.fromJson(response.data ?? const <String, dynamic>{});
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Upload
+// ---------------------------------------------------------------------------
+
+class UploadResult {
+  final String memoryId;
+  final String filename;
+  final String status;
+
+  const UploadResult({
+    required this.memoryId,
+    required this.filename,
+    required this.status,
+  });
+}
+
+final uploadControllerProvider =
+    AsyncNotifierProvider<UploadController, UploadResult?>(UploadController.new);
+
+class UploadController extends AsyncNotifier<UploadResult?> {
+  @override
+  Future<UploadResult?> build() async => null;
+
+  void reset() => state = const AsyncData(null);
+
+  Future<void> upload({
+    required PlatformFile file,
+    String userId = demoUserId,
+  }) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final dio = ref.read(dioProvider);
+      final FormData formData;
+      final path = file.path;
+      if (path != null) {
+        formData = FormData.fromMap({
+          'file': await MultipartFile.fromFile(path, filename: file.name),
+        });
+      } else {
+        // Web fallback — bytes are always available on web
+        formData = FormData.fromMap({
+          'file': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        });
+      }
+      final response = await dio.post<Map<String, dynamic>>(
+        '/api/v1/memories/upload',
+        queryParameters: {'user_id': userId},
+        data: formData,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 30),
+        ),
+      );
+      final data = response.data!;
+      return UploadResult(
+        memoryId: data['id'] as String,
+        filename: data['original_filename'] as String,
+        status: data['status'] as String,
+      );
     });
   }
 }
