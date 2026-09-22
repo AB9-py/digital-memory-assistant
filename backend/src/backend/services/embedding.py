@@ -46,14 +46,12 @@ class DeterministicEmbeddingProvider(BaseEmbeddingProvider):
             weight = 1.0 / math.sqrt(i + 1)
             vector[idx] += weight
 
-            # Also hash character bigrams for subword similarity
             for j in range(len(word) - 1):
                 bigram = word[j : j + 2]
                 bg_hash = int(hashlib.md5(bigram.encode("utf-8")).hexdigest(), 16)
                 bg_idx = bg_hash % self.dimension
                 vector[bg_idx] += 0.2
 
-        # L2-normalize the vector
         magnitude = math.sqrt(sum(v * v for v in vector))
         if magnitude > 0:
             return [v / magnitude for v in vector]
@@ -64,6 +62,29 @@ class DeterministicEmbeddingProvider(BaseEmbeddingProvider):
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         return [self._generate_vector(t) for t in texts]
+
+
+class LocalEmbeddingProvider(BaseEmbeddingProvider):
+    """
+    Free, local semantic embeddings via sentence-transformers.
+    No API key required. Model downloads once (~130 MB for bge-small).
+    Default: BAAI/bge-small-en-v1.5 → 384-dim vectors.
+    Set EMBEDDING_DIM=384 in .env when using this provider.
+    """
+
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
+        from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
+
+        self.model = SentenceTransformer(model_name)
+        self.dimension: int = self.model.get_sentence_embedding_dimension() or 384
+
+    async def embed_text(self, text: str) -> list[float]:
+        return self.model.encode(text, normalize_embeddings=True).tolist()
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        return self.model.encode(texts, normalize_embeddings=True).tolist()
 
 
 class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
@@ -96,7 +117,6 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
             response = await client.post(self.api_url, headers=headers, json=json_data)
             response.raise_for_status()
             data = response.json()
-            # Sort by index to ensure matching order
             sorted_data = sorted(data["data"], key=lambda item: item["index"])
             return [item["embedding"] for item in sorted_data]
 
@@ -108,29 +128,6 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         if not texts:
             return []
         return await self._call_api(texts)
-
-
-class LocalEmbeddingProvider(BaseEmbeddingProvider):
-    """
-    Free, local semantic embeddings via sentence-transformers.
-    No API key required. Model downloads once (~130 MB for bge-small).
-    Default: BAAI/bge-small-en-v1.5 → 384-dim vectors.
-    Set EMBEDDING_DIM=384 in .env when using this provider.
-    """
-
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
-        from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
-
-        self.model = SentenceTransformer(model_name)
-        self.dimension: int = self.model.get_sentence_embedding_dimension() or 384
-
-    async def embed_text(self, text: str) -> list[float]:
-        return self.model.encode(text, normalize_embeddings=True).tolist()
-
-    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        if not texts:
-            return []
-        return self.model.encode(texts, normalize_embeddings=True).tolist()
 
 
 _provider_instance: BaseEmbeddingProvider | None = None
