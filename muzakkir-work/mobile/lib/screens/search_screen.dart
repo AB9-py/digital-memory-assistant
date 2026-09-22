@@ -52,6 +52,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
 
+    // Reset any previous upload state, then kick off the upload immediately.
+    ref.read(uploadControllerProvider.notifier).reset();
+    ref.read(uploadControllerProvider.notifier).upload(file: _selectedFile!);
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -305,7 +309,7 @@ class _UploadPanel extends StatelessWidget {
   }
 }
 
-class _UploadStatusSheet extends StatelessWidget {
+class _UploadStatusSheet extends ConsumerWidget {
   const _UploadStatusSheet({
     required this.file,
     required this.onClear,
@@ -315,12 +319,18 @@ class _UploadStatusSheet extends StatelessWidget {
   final VoidCallback onClear;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uploadState = ref.watch(uploadControllerProvider);
     final isPdf = file.name.toLowerCase().endsWith('.pdf');
     final sizeKb = (file.size / 1024).toStringAsFixed(1);
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,18 +355,68 @@ class _UploadStatusSheet extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _DetailRow(label: 'File Size', value: '$sizeKb KB'),
-          _DetailRow(label: 'Format', value: isPdf ? 'PDF (Portable Document Format)' : 'Plain Text'),
-          _DetailRow(label: 'Pipeline Status', value: 'Validated for Module 1 Ingestion'),
+          _DetailRow(
+            label: 'Format',
+            value: isPdf ? 'PDF (Portable Document Format)' : 'Plain Text',
+          ),
           const Divider(height: 24),
-          Text(
-            'Pipeline Handshake:',
-            style: Theme.of(context).textTheme.labelLarge,
+
+          // Upload status area
+          uploadState.when(
+            loading: () => const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 12),
+                Text('Uploading — extracting chunks + embedding…'),
+              ],
+            ),
+            error: (err, _) => Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Upload failed: $err',
+                    style: TextStyle(color: Colors.red.shade700),
+                  ),
+                ),
+              ],
+            ),
+            data: (result) {
+              if (result == null) {
+                return const SizedBox.shrink();
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Stored in vector memory',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  _DetailRow(label: 'Status', value: result.status),
+                  _DetailRow(
+                    label: 'Memory ID',
+                    value: result.memoryId.substring(0, 8) + '…',
+                  ),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 6),
-          Text(
-            'The client validates and packages the file for Module 1 text extraction & chunking. Once chunked, Abhinav\'s service generates 1536-dim embeddings stored into pgvector.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+
           const SizedBox(height: 20),
           Row(
             children: [
