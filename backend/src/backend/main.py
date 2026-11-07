@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.memories import router as memories_router
 from backend.config import settings
@@ -10,6 +11,15 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Backend API for Digital Memory Assistant with pgvector semantic retrieval.",
+)
+
+# Enable CORS for Flutter web / frontend clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # API v1 Router
