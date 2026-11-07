@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_config.dart';
-import '../models/health_status.dart';
 import '../providers/api_providers.dart';
 
 class HealthScreen extends ConsumerWidget {

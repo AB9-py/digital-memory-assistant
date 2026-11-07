@@ -21,9 +21,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   static const _sampleQueries = [
     "What is Banker's algorithm?",
-    "What did I learn about deadlock prevention?",
+    'What did I learn about deadlock prevention?',
     "How does Dijkstra's algorithm work in link state routing?",
-    "What are Coffman conditions?",
+    'What are Coffman conditions?',
   ];
 
   @override
