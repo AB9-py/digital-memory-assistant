@@ -6,7 +6,9 @@ import '../models/search_models.dart';
 import '../providers/api_providers.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.onViewMemories});
+
+  final VoidCallback? onViewMemories;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -33,7 +35,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['pdf', 'txt'],
+      allowedExtensions: const ['pdf', 'txt', 'docx', 'png', 'jpg', 'jpeg'],
+      withData: true,
     );
     if (!mounted || result == null || result.files.isEmpty) {
       return;
@@ -45,14 +48,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a PDF or text file first.'),
+          content: Text('Please select a document or image file first.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    // Reset any previous upload state, then kick off the upload immediately.
+    // Reset previous state and trigger upload immediately
     ref.read(uploadControllerProvider.notifier).reset();
     ref.read(uploadControllerProvider.notifier).upload(file: _selectedFile!);
 
@@ -68,6 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           setState(() => _selectedFile = null);
           Navigator.of(ctx).pop();
         },
+        onViewMemories: widget.onViewMemories,
       ),
     );
   }
@@ -200,9 +204,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                       ),
-                      Chip(
+                      const Chip(
                         visualDensity: VisualDensity.compact,
-                        label: const Text('Top-K Cosine Match'),
+                        label: Text('Top-K Cosine Match'),
                       ),
                     ],
                   ),
@@ -238,12 +242,43 @@ class _UploadPanel extends StatelessWidget {
   final VoidCallback onPickFile;
   final VoidCallback onUploadPressed;
 
+  IconData _getFileIcon(String ext) {
+    switch (ext) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'docx':
+        return Icons.description;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        return Icons.image_outlined;
+      default:
+        return Icons.article_outlined;
+    }
+  }
+
+  Color _getFileColor(String ext) {
+    switch (ext) {
+      case 'pdf':
+        return Colors.red.shade700;
+      case 'docx':
+        return Colors.indigo.shade700;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        return Colors.purple.shade700;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasFile = selectedFile != null;
     final fileName = selectedFile?.name ?? 'No document selected';
-    final isPdf = fileName.toLowerCase().endsWith('.pdf');
-    final fileSizeKb = hasFile ? (selectedFile!.size / 1024).toStringAsFixed(1) : '0';
+    final ext = (selectedFile?.extension ?? '').toLowerCase();
+    final fileSizeKb =
+        hasFile ? (selectedFile!.size / 1024).toStringAsFixed(1) : '0';
 
     return Card(
       child: Padding(
@@ -254,11 +289,9 @@ class _UploadPanel extends StatelessWidget {
             Row(
               children: [
                 Icon(
-                  hasFile
-                      ? (isPdf ? Icons.picture_as_pdf : Icons.description)
-                      : Icons.upload_file,
+                  hasFile ? _getFileIcon(ext) : Icons.upload_file,
                   color: hasFile
-                      ? (isPdf ? Colors.red.shade700 : Colors.blue.shade700)
+                      ? _getFileColor(ext)
                       : Theme.of(context).colorScheme.primary,
                   size: 28,
                 ),
@@ -277,7 +310,7 @@ class _UploadPanel extends StatelessWidget {
                       ),
                       if (hasFile)
                         Text(
-                          '$fileSizeKb KB • ${isPdf ? 'PDF Document' : 'Text File'}',
+                          '$fileSizeKb KB • ${ext.toUpperCase()}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                     ],
@@ -313,15 +346,17 @@ class _UploadStatusSheet extends ConsumerWidget {
   const _UploadStatusSheet({
     required this.file,
     required this.onClear,
+    this.onViewMemories,
   });
 
   final PlatformFile file;
   final VoidCallback onClear;
+  final VoidCallback? onViewMemories;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uploadState = ref.watch(uploadControllerProvider);
-    final isPdf = file.name.toLowerCase().endsWith('.pdf');
+    final ext = (file.extension ?? '').toLowerCase();
     final sizeKb = (file.size / 1024).toStringAsFixed(1);
 
     return Padding(
@@ -338,9 +373,9 @@ class _UploadStatusSheet extends ConsumerWidget {
           Row(
             children: [
               Icon(
-                isPdf ? Icons.picture_as_pdf : Icons.description,
-                color: isPdf ? Colors.red.shade700 : Colors.blue.shade700,
-                size: 32,
+                Icons.upload_file_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 30,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -355,13 +390,10 @@ class _UploadStatusSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           _DetailRow(label: 'File Size', value: '$sizeKb KB'),
-          _DetailRow(
-            label: 'Format',
-            value: isPdf ? 'PDF (Portable Document Format)' : 'Plain Text',
-          ),
+          _DetailRow(label: 'Format', value: ext.toUpperCase()),
           const Divider(height: 24),
 
-          // Upload status area
+          // Upload state indicator
           uploadState.when(
             loading: () => const Row(
               children: [
@@ -370,17 +402,19 @@ class _UploadStatusSheet extends ConsumerWidget {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                SizedBox(width: 12),
-                Text('Uploading — extracting chunks + embedding…'),
+                SizedBox(width: 14),
+                Expanded(
+                  child: Text('Uploading, extracting text & embedding into pgvector…'),
+                ),
               ],
             ),
             error: (err, _) => Row(
               children: [
                 Icon(Icons.error_outline, color: Colors.red.shade700),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Upload failed: $err',
+                    'Upload error: $err',
                     style: TextStyle(color: Colors.red.shade700),
                   ),
                 ),
@@ -390,6 +424,10 @@ class _UploadStatusSheet extends ConsumerWidget {
               if (result == null) {
                 return const SizedBox.shrink();
               }
+              final displayId = result.memoryId.length > 8
+                  ? '${result.memoryId.substring(0, 8)}…'
+                  : result.memoryId;
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -406,12 +444,9 @@ class _UploadStatusSheet extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   _DetailRow(label: 'Status', value: result.status),
-                  _DetailRow(
-                    label: 'Memory ID',
-                    value: result.memoryId.substring(0, 8) + '…',
-                  ),
+                  _DetailRow(label: 'Memory ID', value: displayId),
                 ],
               );
             },
@@ -429,8 +464,19 @@ class _UploadStatusSheet extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    if (uploadState.hasValue &&
+                        uploadState.value != null &&
+                        onViewMemories != null) {
+                      onViewMemories!();
+                    }
+                  },
+                  child: Text(
+                    uploadState.hasValue && uploadState.value != null
+                        ? 'Done'
+                        : 'Close',
+                  ),
                 ),
               ),
             ],
@@ -612,7 +658,8 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = color ?? Theme.of(context).colorScheme.onSurfaceVariant;
+    final effectiveColor =
+        color ?? Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Card(
       child: Padding(

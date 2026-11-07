@@ -1,26 +1,36 @@
 # Muzakkir (Syed) Work — Mobile UI & Client Integration
 
-This folder contains Syed Muzakkir's allotted deliverables for the **Digital Memory Assistant 2nd Review (20% Implementation Milestone)**.
+This folder contains Syed Muzakkir's completed client deliverables for the **Digital Memory Assistant**.
 
 ---
 
-## Deliverables & Features
+## Deliverables & Architecture
 
 - **Flutter Client Architecture:** Built with `flutter_riverpod` state management and `dio` HTTP client.
-- **Screen 1 (System Health & Connection):**
-  - Probes `GET /health` with millisecond latency tracking.
-  - Prominent visual status badges:
+- **Screen 1 (System Health & Server Configuration):**
+  - Probes `GET /health` with real-time millisecond roundtrip latency tracking.
+  - Interactive **Server Configuration Dialog** allowing seamless switching between presets:
+    - Localhost (`http://127.0.0.1:8000`)
+    - Android Emulator (`http://10.0.2.2:8000`)
+    - Custom LAN / Wi-Fi IP address
+  - Prominent visual status banners:
     - 🟢 `Backend & DB Connected` (FastAPI + pgvector fully operational)
     - 🟡 `Backend Connected (DB Disconnected)` (FastAPI alive, PostgreSQL container offline)
-    - 🔴 `Backend Disconnected` (Network error / server offline)
+    - 🔴 `Backend Disconnected` (Network error / server offline with diagnostic hints)
   - Live server metadata (API Version, Environment, Target URL).
-- **Screen 2 (Semantic Memory Retrieval & Ingestion):**
-  - **Document Selection & Upload:** Integrated `file_picker` for `.pdf` and `.txt` files with file details (size, format) and an explicit **"Upload to Memory"** button and validation status sheet.
-  - **Preset Query Chips:** Quick-select chips for review demonstration (`"What is Banker's algorithm?"`, `"What did I learn about deadlock prevention?"`, `"How does Dijkstra's algorithm work?"`).
-  - **pgvector Cosine Similarity Match Cards:** Renders retrieved chunks with document title, page number / chunk index badge, exact decimal score (`0.3020`), match percentage (`30%`), and quoted snippet.
-  - **Grounding & Negative Filter:** Displays zero false-positive indicator when queries fall below similarity threshold.
-- **Testing Suite:** Comprehensive unit tests in `test/models_test.dart` validating `HealthStatus`, `SearchRequest`, and `SearchResponse` edge cases and JSON schemas.
-- **Review Presentation Guide:** See [REVIEW_PRESENTATION_GUIDE.md](file:///s:/GIT/digital-memory-assistant/muzakkir-work/REVIEW_PRESENTATION_GUIDE.md) for Syed's 60-second live demo speaking script and answers to evaluator questions.
+- **Screen 2 (Semantic Memory Retrieval & Document Ingestion):**
+  - **Multi-Format Document Upload:** Integrated file picker supporting `.pdf`, `.docx`, `.txt`, `.png`, `.jpg`, `.jpeg` with safe fallback for both filesystem paths and raw memory bytes.
+  - **Live Multipart Upload:** Directly sends documents to `POST /api/v1/memories/upload`, extracting chunks and embedding into pgvector in real time.
+  - **Preset Query Chips:** Quick-select chips for demonstration (`"What is Banker's algorithm?"`, `"What did I learn about deadlock prevention?"`, `"How does Dijkstra's algorithm work in link state routing?"`).
+  - **pgvector Cosine Similarity Match Cards:** Renders retrieved chunks with document title, page number / chunk index badge, exact decimal score (`0.3020`), match percentage (`30%`), and styled quoted content.
+  - **Grounding & Zero False-Positive Handling:** Clean notification when no chunks exceed the similarity threshold.
+- **Screen 3 (Stored Documents & Memory Management):**
+  - Dedicated **Memories** screen connecting to `GET /api/v1/memories`.
+  - Displays document cards with file format badges (PDF, DOCX, TXT, IMAGE), size, processing status, and upload dates.
+  - Document deletion with confirmation dialog via `DELETE /api/v1/memories/{id}`.
+  - Pull-to-refresh and empty-state guidance.
+- **Testing Suite:** Comprehensive unit tests in `test/models_test.dart` validating `HealthStatus`, `SearchRequest`, `SearchResponse`, `MemoryItem`, and `MemoryListResponse` edge cases.
+- **Multi-Platform Support:** Ready-to-run platform wrappers for Web (`web/`) and Android (`android/`).
 
 ---
 
@@ -32,20 +42,20 @@ flutter pub get
 flutter run
 ```
 
-### Backend Connection Details
+### Target Platforms
 
-- **Desktop (Windows/macOS), iOS Simulator, Web:** `http://127.0.0.1:8000`
-- **Android Emulator:** `http://10.0.2.2:8000` (auto-detected)
-- **Custom Override:**
+- **Chrome / Web:** `flutter run -d chrome`
+- **Android Emulator:** `flutter run -d emulator` (auto-detects `10.0.2.2:8000`)
+- **Windows Desktop:** `flutter run -d windows`
+- **Custom Backend URL:** Set dynamically in the app's Health screen or pass via command-line:
   ```bash
   flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000
   ```
 
 ---
 
-## Live Backup
+## Live Backup & Review Resources
 
-During review evaluation, the OpenAPI interactive Swagger documentation is available in any browser at:
-- **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Health Check:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-
+- **Review Presentation Guide:** [REVIEW_PRESENTATION_GUIDE.md](file:///s:/GIT/digital-memory-assistant/muzakkir-work/REVIEW_PRESENTATION_GUIDE.md) (60-second live demo script + evaluator Q&A answers).
+- **Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **Health Check Endpoint:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)

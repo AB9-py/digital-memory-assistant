@@ -1,4 +1,5 @@
 import 'package:digital_memory_assistant/models/health_status.dart';
+import 'package:digital_memory_assistant/models/memory_models.dart';
 import 'package:digital_memory_assistant/models/search_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -135,6 +136,61 @@ void main() {
 
       expect(response.totalResults, 0);
       expect(response.results, isEmpty);
+    });
+  });
+
+  group('MemoryItem & MemoryListResponse Model Tests', () {
+    test('parses MemoryItem from backend JSON', () {
+      final item = MemoryItem.fromJson({
+        'id': '550e8400-e29b-41d4-a716-446655440000',
+        'user_id': '00000000-0000-0000-0000-000000000001',
+        'original_filename': 'Machine_Learning_Notes.pdf',
+        'file_type': 'PDF',
+        'file_path': './uploads/ml_notes.pdf',
+        'file_size_bytes': 2048576,
+        'status': 'processed',
+        'created_at': '2026-11-07T10:00:00Z',
+        'updated_at': '2026-11-07T10:00:00Z',
+        'meta_info': {'page_count': 12},
+      });
+
+      expect(item.id, '550e8400-e29b-41d4-a716-446655440000');
+      expect(item.originalFilename, 'Machine_Learning_Notes.pdf');
+      expect(item.isPdf, isTrue);
+      expect(item.isImage, isFalse);
+      expect(item.isProcessed, isTrue);
+      expect(item.formattedFileSize, '2.0 MB');
+    });
+
+    test('parses MemoryListResponse with multiple items', () {
+      final list = MemoryListResponse.fromJson({
+        'total': 2,
+        'items': [
+          {
+            'id': 'id-1',
+            'user_id': 'u-1',
+            'original_filename': 'note.txt',
+            'file_type': 'TEXT',
+            'file_path': '/path/note.txt',
+            'file_size_bytes': 1500,
+            'status': 'processed',
+          },
+          {
+            'id': 'id-2',
+            'user_id': 'u-1',
+            'original_filename': 'photo.png',
+            'file_type': 'IMAGE',
+            'file_path': '/path/photo.png',
+            'file_size_bytes': 512000,
+            'status': 'uploaded',
+          },
+        ],
+      });
+
+      expect(list.total, 2);
+      expect(list.items.length, 2);
+      expect(list.items.first.formattedFileSize, '1.5 KB');
+      expect(list.items.last.isImage, isTrue);
     });
   });
 }

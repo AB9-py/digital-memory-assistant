@@ -1,0 +1,11 @@
+{
+    "name": "Digital Memory Assistant",
+    "short_name": "DigitalMemory",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#2563EB",
+    "theme_color": "#2563EB",
+    "description": "Personal digital memory and semantic retrieval assistant.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false
+}

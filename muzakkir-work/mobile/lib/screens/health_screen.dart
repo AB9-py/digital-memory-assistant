@@ -8,14 +8,89 @@ import '../providers/api_providers.dart';
 class HealthScreen extends ConsumerWidget {
   const HealthScreen({super.key});
 
+  void _showConfigureUrlDialog(BuildContext context, WidgetRef ref) {
+    final currentUrl = ref.read(apiBaseUrlProvider);
+    final controller = TextEditingController(text: currentUrl);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Configure Backend Server'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select a preset or enter your backend server URL:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'API Base URL',
+                hintText: 'http://127.0.0.1:8000',
+                prefixIcon: Icon(Icons.dns_outlined),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  label: const Text('Localhost (127.0.0.1)'),
+                  onPressed: () {
+                    controller.text = localhostBaseUrl;
+                  },
+                ),
+                ActionChip(
+                  label: const Text('Android (10.0.2.2)'),
+                  onPressed: () {
+                    controller.text = androidEmulatorBaseUrl;
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final newUrl = controller.text.trim().replaceAll(RegExp(r'/+$'), '');
+              if (newUrl.isNotEmpty) {
+                ref.read(apiBaseUrlProvider.notifier).state = newUrl;
+                ref.invalidate(healthProvider);
+              }
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Save & Reconnect'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final health = ref.watch(healthProvider);
+    final currentBaseUrl = ref.watch(apiBaseUrlProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('System Health & Connection'),
         actions: [
+          IconButton(
+            tooltip: 'Configure Backend URL',
+            onPressed: () => _showConfigureUrlDialog(context, ref),
+            icon: const Icon(Icons.settings_outlined),
+          ),
           IconButton(
             tooltip: 'Refresh Status',
             onPressed: () => ref.invalidate(healthProvider),
@@ -26,46 +101,55 @@ class HealthScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Target Base URL Info Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
+          // Target Base URL Info Bar with tap-to-configure
+          InkWell(
+            onTap: () => _showConfigureUrlDialog(context, ref),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.link,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Target Backend URL',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                      Text(
-                        '${defaultApiBaseUrl()}/health',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontFamily: 'monospace',
-                            ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.link,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Backend Endpoint (Tap to edit)',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        Text(
+                          '$currentBaseUrl/health',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'monospace',
+                              ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -89,10 +173,10 @@ class HealthScreen extends ConsumerWidget {
             error: (error, stackTrace) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _StatusBanner(
+                _StatusBanner(
                   state: _BannerState.error,
                   title: 'Backend Disconnected',
-                  subtitle: 'Could not reach FastAPI server on 127.0.0.1:8000',
+                  subtitle: 'Could not reach server at $currentBaseUrl',
                 ),
                 const SizedBox(height: 16),
                 _StatusPanel(
@@ -110,7 +194,8 @@ class HealthScreen extends ConsumerWidget {
                       ok: false,
                     ),
                   ],
-                  footer: 'Error: $error\nEnsure uvicorn is running: python -m uvicorn backend.main:app --port 8000',
+                  footer:
+                      'Error: $error\n\nTroubleshooting:\n• If running locally: run uvicorn backend.main:app --port 8000\n• If on Android emulator: use http://10.0.2.2:8000\n• If on a physical phone: use your computer\'s local Wi-Fi IP (e.g. http://192.168.1.x:8000)',
                 ),
               ],
             ),
@@ -127,7 +212,8 @@ class HealthScreen extends ConsumerWidget {
                   const _StatusBanner(
                     state: _BannerState.partial,
                     title: 'Backend Connected (DB Disconnected)',
-                    subtitle: 'FastAPI is alive; PostgreSQL container is offline or unmigrated',
+                    subtitle:
+                        'FastAPI is operational; PostgreSQL container is offline or unmigrated',
                   )
                 else
                   const _StatusBanner(
@@ -193,7 +279,7 @@ class HealthScreen extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Review Note: Screen 1 validates the Phase 0 communication goal. Evaluators can also verify the live OpenAPI schema at http://127.0.0.1:8000/docs.',
+                      'Review Note: Screen 1 validates client-server connectivity. You can test live Swagger documentation at $currentBaseUrl/docs.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
